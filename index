@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Cómputo</title>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; display: flex; min-height: 100vh; color: #1e293b; }
+
+  /* Sidebar */
+  .sidebar { width: 230px; background: #1a1f2e; color: white; height: 100vh; padding: 20px 0; position: sticky; top: 0; flex-shrink: 0; overflow-y: auto; }
+  .sidebar-logo { padding: 0 16px 6px; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .02em; }
+  .sidebar-sub { padding: 0 16px 18px; font-size: 11px; color: rgba(255,255,255,0.35); border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; }
+  .sidebar nav button { width: 100%; background: none; border: none; border-left: 2px solid transparent; color: rgba(255,255,255,0.6); padding: 10px 16px; text-align: left; cursor: pointer; font-size: 13px; transition: all .15s; display: flex; align-items: center; gap: 8px; }
+  .sidebar nav button:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .sidebar nav button.active { color: #fff; border-left-color: #6366f1; background: rgba(99,102,241,0.15); }
+  .nav-icon { font-size: 15px; flex-shrink: 0; }
+  .sidebar-badge { display: inline-flex; align-items: center; justify-content: center; background: #dc2626; color: white; font-size: 10px; font-weight: 700; border-radius: 20px; padding: 1px 6px; margin-left: auto; min-width: 18px; }
+
+  /* Layout */
+  .main { flex: 1; padding: 24px; overflow: auto; }
+  .section { display: none; }
+  .section.visible { display: block; }
+  .page-header { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+  .page-header h2 { font-size: 18px; font-weight: 600; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* Metrics */
+  .metrics-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+  .metric { background: white; border-radius: 10px; padding: 16px; border: 0.5px solid rgba(0,0,0,0.07); }
+  .metric-label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .metric-value { font-size: 28px; font-weight: 600; color: #1e293b; }
+  .metric-value.ok   { color: #16a34a; }
+  .metric-value.fail { color: #dc2626; }
+  .metric-value.warn { color: #d97706; }
+  .metric-value.info { color: #6366f1; }
+  .metric-sub { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+
+  /* Cards */
+  .card { background: white; border-radius: 12px; padding: 20px; border: 0.5px solid rgba(0,0,0,0.07); margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+  .badge-ok     { background: #dcfce7; color: #166534; }
+  .badge-warn   { background: #fef9c3; color: #854d0e; }
+  .badge-danger { background: #fee2e2; color: #991b1b; }
+  .badge-info   { background: #ede9fe; color: #5b21b6; }
+
+  /* Estado chips */
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .chip-activo   { background: #dcfce7; color: #166534; }
+  .chip-falla    { background: #fee2e2; color: #991b1b; }
+  .chip-mant     { background: #fef9c3; color: #854d0e; }
+  .chip-baja     { background: #f1f5f9; color: #64748b; }
+  .chip-laptop   { background: #ede9fe; color: #5b21b6; }
+  .chip-desktop  { background: #dbeafe; color: #1d4ed8; }
+
+  /* Forms */
+  .form-section { margin-bottom: 18px; }
+  .form-section-title { font-size: 12px; font-weight: 600; color: #6366f1; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 12px; color: #64748b; font-weight: 500; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;
+    font-size: 13px; color: #1e293b; background: white; outline: none; transition: border-color .15s; font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #6366f1; }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .span2 { grid-column: span 2; }
+  .span3 { grid-column: span 3; }
+
+  /* Buttons */
+  .btn { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: #6366f1; color: white; }
+  .btn-danger  { background: #dc2626; color: white; }
+  .btn-success { background: #16a34a; color: white; }
+  .btn-amber   { background: #d97706; color: white; }
+  .btn-gray    { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+  .btn-outline { background: white; color: #6366f1; border: 1px solid #6366f1; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { border-bottom: 2px solid #e2e8f0; background: #f8fafc; }
+  th { padding: 9px 10px; text-align: left; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: 10px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+  tr:hover td { background: #fafafa; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-bar select, .filter-bar input { padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 13px; outline: none; color: #1e293b; }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: #6366f1; }
+
+  /* Empty */
+  .empty { text-align: center; padding: 40px; color: #94a3b8; font-size: 13px; }
+  .empty .e-icon { font-size: 32px; margin-bottom: 10px; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: white; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9999; }
+  #toast.show { opacity: 1; }
+
+  /* Branch bars */
+  .branch-list { display: flex; flex-direction: column; gap: 10px; }
+  .branch-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .branch-name { width: 120px; color: #64748b; flex-shrink: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { flex: 1; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+  .branch-count { font-size: 12px; color: #94a3b8; min-width: 30px; text-align: right; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 14px; width: 780px; max-width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.2); }
+  .modal-header { padding: 18px 22px 14px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: flex-start; justify-content: space-between; }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-sub { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .modal-close { background: none; border: none; font-size: 22px; color: #94a3b8; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: #1e293b; }
+  .modal-body { flex: 1; overflow-y: auto; padding: 18px 22px; }
+  .modal-footer { padding: 14px 22px; border-top: 1px solid #f1f5f9; display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Equipo detail card */
+  .detail-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
+  .detail-item { background: #f8fafc; border-radius: 8px; padding: 10px 12px; }
+  .detail-label { font-size: 11px; color: #94a3b8; margin-bottom: 3px; }
+  .detail-value { font-size: 13px; font-weight: 500; color: #1e293b; word-break: break-all; }
+  .detail-item.highlight { background: #ede9fe; }
+  .detail-item.highlight .detail-value { color: #5b21b6; }
+
+  /* Mantenimiento preventivo */
+  .mant-card { background: white; border-radius: 10px; padding: 14px 16px; border: 0.5px solid rgba(0,0,0,0.07); }
+  .mant-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .mant-equipo { font-size: 13px; font-weight: 600; color: #1e293b; }
+  .mant-sucursal { font-size: 11px; color: #94a3b8; }
+  .mant-fecha { font-size: 12px; }
+  .mant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 12px; }
+  .mant-dias-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; }
+  .mant-vencido  { background: #fee2e2; color: #991b1b; }
+  .mant-proximo  { background: #fef9c3; color: #854d0e; }
+  .mant-ok       { background: #dcfce7; color: #166534; }
+  .mant-sin-prog { background: #f1f5f9; color: #64748b; }
+  .prog-bar-wrap { margin-top: 6px; }
+  .prog-bar-track { height: 6px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+  .prog-bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+
+  /* Alertas */
+  .alerta-item { display: flex; align-items: center; gap: 12px; background: white; border-radius: 8px; padding: 10px 14px; border: 0.5px solid rgba(0,0,0,.07); font-size: 13px; margin-bottom: 7px; }
+  .alerta-item.red    { border-left: 3px solid #dc2626; }
+  .alerta-item.yellow { border-left: 3px solid #d97706; }
+  .alerta-item.blue   { border-left: 3px solid #6366f1; }
+  .alerta-body { flex: 1; }
+  .alerta-title { font-weight: 500; }
+  .alerta-sub   { font-size: 12px; color: #94a3b8; margin-top: 1px; }
+  .alerta-dias  { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+  .alerta-dias.red    { background: #fee2e2; color: #991b1b; }
+  .alerta-dias.yellow { background: #fef9c3; color: #854d0e; }
+  .alerta-dias.blue   { background: #ede9fe; color: #5b21b6; }
+
+  /* Timeline bitácora */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item { display: flex; gap: 12px; padding-bottom: 16px; position: relative; }
+  .tl-item:not(:last-child)::before { content:''; position:absolute; left:15px; top:32px; bottom:0; width:2px; background:#f1f5f9; }
+  .tl-dot { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .tl-dot.sistema { background: #ede9fe; }
+  .tl-dot.usuario  { background: #dcfce7; }
+  .tl-content { flex: 1; }
+  .tl-meta { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .tl-text { font-size: 13px; color: #334155; background: #f8fafc; border-radius: 8px; padding: 8px 12px; line-height: 1.5; }
+  .tl-text.sistema { background: #ede9fe; color: #3730a3; font-style: italic; }
+
+  /* Period pills */
+  .period-pills { display: flex; gap: 6px; }
+  .period-pill { padding: 5px 14px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; font-size: 12px; font-weight: 500; color: #64748b; cursor: pointer; transition: all .15s; }
+  .period-pill:hover { border-color: #6366f1; color: #6366f1; }
+  .period-pill.active { background: #6366f1; border-color: #6366f1; color: white; }
+
+  /* Export btn */
+  .btn-export { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+  .btn-export:hover { background: #dcfce7; }
+
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
+  .alert-pulse { animation: pulse 2s infinite; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">🖥 Cómputo PRO</div>
+  <div class="sidebar-sub">Control de equipos</div>
+  <nav>
+    <button class="active" onclick="mostrar('dashboard',this)"><span class="nav-icon">📊</span>Dashboard</button>
+    <button onclick="mostrar('inventario',this)"><span class="nav-icon">🖥</span>Inventario</button>
+    <button onclick="mostrar('incidencias',this)"><span class="nav-icon">🔧</span>Incidencias</button>
+    <button onclick="mostrar('mantenimiento',this)"><span class="nav-icon">📅</span>Mantenimiento</button>
+    <button onclick="mostrar('alertas',this)"><span class="nav-icon">🚨</span>Alertas <span class="sidebar-badge" id="sidebarBadge" style="display:none">0</span></button>
+    <button onclick="mostrar('historico',this)"><span class="nav-icon">📋</span>Histórico</button>
+    <button onclick="mostrar('reportes',this)"><span class="nav-icon">📈</span>Reportes</button>
+    <button onclick="mostrar('config',this)"><span class="nav-icon">⚙️</span>Configuración</button>
+  </nav>
+</div>
+
+<div class="main">
+
+  <!-- ══ DASHBOARD ══ -->
+  <div id="dashboard" class="section visible">
+    <div class="page-header"><h2>Dashboard general</h2></div>
+    <div class="metrics-grid">
+      <div class="metric"><div class="metric-label">Total equipos</div><div class="metric-value info" id="dTotal">—</div><div class="metric-sub">en toda la red</div></div>
+      <div class="metric"><div class="metric-label">Operativos</div><div class="metric-value ok" id="dOperativos">—</div><div class="metric-sub" id="dPctOp">—</div></div>
+      <div class="metric"><div class="metric-label">Con falla</div><div class="metric-value fail" id="dFallas">—</div><div class="metric-sub" id="dPctFalla">—</div></div>
+      <div class="metric"><div class="metric-label">Mantenimiento pendiente</div><div class="metric-value warn" id="dMant">—</div><div class="metric-sub">vencido o próximo</div></div>
+    </div>
+
+    <!-- Alertas widget -->
+    <div id="dashAlertasWrap" style="display:none;margin-bottom:16px">
+      <div class="card" style="border-left:3px solid #dc2626;padding:16px 20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px">
+            <span class="alert-pulse">🚨</span> Alertas activas
+            <span class="badge badge-danger" id="dashAlertaTotal">0</span>
+          </div>
+          <button class="btn btn-sm btn-gray" onclick="mostrar('alertas',document.querySelector('.sidebar nav button:nth-child(5)'))">Ver todas</button>
+        </div>
+        <div id="dashAlertasList"></div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">📊 Estado por tipo</div>
+        <div style="position:relative;height:220px"><canvas id="graficaTipo"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏢 Equipos por sucursal</div>
+        <div class="branch-list" id="branchBars"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔧 Incidencias abiertas <span class="badge badge-danger" id="dIncAbiertas" style="font-size:11px">0</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sucursal</th><th>Equipo</th><th>Colaborador</th><th>Técnico</th><th>Estado</th><th>Días abierto</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaIncDash"></tbody>
+        </table>
+        <div id="emptyIncDash" class="empty" style="display:none"><div class="e-icon">✅</div>Sin incidencias abiertas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ INVENTARIO ══ -->
+  <div id="inventario" class="section">
+    <div class="page-header">
+      <h2>Inventario de equipos</h2>
+      <button class="btn btn-primary" onclick="abrirModalEquipo()">+ Agregar equipo</button>
+    </div>
+    <div class="filter-bar">
+      <select id="filtInvSuc" onchange="renderInventario()">
+        <option value="">Todas las sucursales</option>
+        <option>Corporativo</option><option>Cedis</option><option>Hidalgo</option>
+        <option>Construcasa</option><option>Ferrocarril</option><option>Simbolos</option>
+        <option>Santa Rosa</option><option>Atzompa</option><option>Viguera</option>
+        <option>Reforma</option><option>Tehuantepec</option><option>Puerto Escondido</option>
+      </select>
+      <select id="filtInvTipo" onchange="renderInventario()">
+        <option value="">Todos los tipos</option>
+        <option value="Desktop">Desktop</option>
+        <option value="Laptop">Laptop</option>
+      </select>
+      <select id="filtInvEstado" onchange="renderInventario()">
+        <option value="">Todos los estados</option>
+        <option value="Activo">Activo</option>
+        <option value="Falla">Falla</option>
+        <option value="Mantenimiento">Mantenimiento</option>
+        <option value="Baja">Baja</option>
+      </select>
+      <input type="text" id="filtInvBusqueda" placeholder="Buscar colaborador, marca, SN…" oninput="renderInventario()" style="min-width:200px">
+      <div style="margin-left:auto;font-size:12px;color:#94a3b8" id="invContador"></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tipo</th><th>Sucursal</th><th>Colaborador</th><th>Marca / Modelo</th><th>S.O</th><th>IP</th><th>Estado</th><th>Próx. Mant.</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaInventario"></tbody>
+        </table>
+        <div id="emptyInv" class="empty" style="display:none"><div class="e-icon">🖥</div>No hay equipos registrados.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ INCIDENCIAS ══ -->
+  <div id="incidencias" class="section">
+    <div class="page-header"><h2>Incidencias</h2></div>
+    <div class="two-col" style="margin-bottom:16px">
+      <!-- Registrar -->
+      <div class="card">
+        <div class="card-title">🔧 Registrar incidencia</div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Sucursal</label>
+          <select id="incSuc" onchange="cargarEquiposInc()">
+            <option value="">Selecciona sucursal</option>
+            <option>Corporativo</option><option>Cedis</option><option>Hidalgo</option>
+            <option>Construcasa</option><option>Ferrocarril</option><option>Simbolos</option>
+            <option>Santa Rosa</option><option>Atzompa</option><option>Viguera</option>
+            <option>Reforma</option><option>Tehuantepec</option><option>Puerto Escondido</option>
+          </select>
+        </div>
+        <div id="incEquipoStep" style="display:none">
+          <div style="font-size:12px;color:#64748b;font-weight:500;margin-bottom:8px">Equipo con falla</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:200px;overflow-y:auto;margin-bottom:10px" id="incEquipoGrid"></div>
+          <div id="incEquipoSelWrap" style="display:none;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:10px;background:#ede9fe;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:500;color:#3730a3">
+              <span id="incEquipoLabel">—</span>
+              <button style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:#94a3b8" onclick="clearIncEquipo()">×</button>
+            </div>
+          </div>
+          <div id="incRestoForm" style="display:none">
+            <div class="form-group" style="margin-bottom:8px"><label>Técnico</label><input id="incTecnico" placeholder="Nombre del técnico"></div>
+            <div class="form-group" style="margin-bottom:10px"><label>Descripción</label><textarea id="incDesc" rows="2" placeholder="Describe el problema…"></textarea></div>
+            <button class="btn btn-primary" onclick="addInc()">Registrar incidencia</button>
+          </div>
+        </div>
+        <input type="hidden" id="incEquipoId">
+        <input type="hidden" id="incEquipoNombre">
+        <input type="hidden" id="incColaborador">
+      </div>
+      <!-- Stats -->
+      <div class="card">
+        <div class="card-title">📊 Resumen incidencias</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div class="metric" style="background:#f8fafc"><div class="metric-label">Abiertas</div><div class="metric-value fail" id="iStatAbiertas">0</div></div>
+          <div class="metric" style="background:#f8fafc"><div class="metric-label">En proceso</div><div class="metric-value warn" id="iStatProceso">0</div></div>
+          <div class="metric" style="background:#f8fafc"><div class="metric-label">Resueltas (mes)</div><div class="metric-value ok" id="iStatResueltas">0</div></div>
+          <div class="metric" style="background:#f8fafc"><div class="metric-label">MTTR promedio</div><div class="metric-value info" id="iStatMTTR">—</div></div>
+        </div>
+      </div>
+    </div>
+    <!-- Historial -->
+    <div class="card">
+      <div class="card-title">📋 Historial de incidencias</div>
+      <div class="filter-bar">
+        <select id="filtIncEstado" onchange="renderTablaInc()">
+          <option value="">Todos los estados</option>
+          <option value="abierta">Abiertas</option>
+          <option value="en proceso">En proceso</option>
+          <option value="resuelta">Resueltas</option>
+        </select>
+        <select id="filtIncSuc" onchange="renderTablaInc()">
+          <option value="">Todas las sucursales</option>
+          <option>Corporativo</option><option>Cedis</option><option>Hidalgo</option>
+          <option>Construcasa</option><option>Ferrocarril</option><option>Simbolos</option>
+          <option>Santa Rosa</option><option>Atzompa</option><option>Viguera</option>
+          <option>Reforma</option><option>Tehuantepec</option><option>Puerto Escondido</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sucursal</th><th>Equipo</th><th>Colaborador</th><th>Técnico</th><th>Estado</th><th>Tiempo</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaInc"></tbody>
+        </table>
+        <div id="emptyInc" class="empty" style="display:none"><div class="e-icon">📋</div>Sin incidencias.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MANTENIMIENTO PREVENTIVO ══ -->
+  <div id="mantenimiento" class="section">
+    <div class="page-header"><h2>Mantenimiento preventivo</h2></div>
+    <div class="filter-bar">
+      <select id="filtMantSuc" onchange="renderMantenimiento()">
+        <option value="">Todas las sucursales</option>
+        <option>Corporativo</option><option>Cedis</option><option>Hidalgo</option>
+        <option>Construcasa</option><option>Ferrocarril</option><option>Simbolos</option>
+        <option>Santa Rosa</option><option>Atzompa</option><option>Viguera</option>
+        <option>Reforma</option><option>Tehuantepec</option><option>Puerto Escondido</option>
+      </select>
+      <select id="filtMantStatus" onchange="renderMantenimiento()">
+        <option value="">Todos</option>
+        <option value="vencido">Vencidos</option>
+        <option value="proximo">Próximos (30 días)</option>
+        <option value="ok">Al corriente</option>
+        <option value="sin">Sin programar</option>
+      </select>
+    </div>
+    <div class="mant-grid" id="mantGrid">
+      <div class="empty">Cargando equipos…</div>
+    </div>
+  </div>
+
+  <!-- ══ ALERTAS ══ -->
+  <div id="alertas" class="section">
+    <div class="page-header"><h2>Alertas <span class="badge badge-danger" id="alertasTotalBadge">0</span></h2></div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:14px">
+      🔴 Incidencias sin mover: <strong>5 días</strong> &nbsp;|&nbsp;
+      🟡 Mantenimiento vencido o próximo en <strong>30 días</strong> &nbsp;|&nbsp;
+      🔵 Equipo en falla sin incidencia: <strong>7 días</strong>
+    </div>
+    <div id="alertasPanel"><div class="empty">Calculando alertas…</div></div>
+  </div>
+
+  <!-- ══ HISTÓRICO ══ -->
+  <div id="historico" class="section">
+    <div class="page-header"><h2>Histórico</h2></div>
+    <div class="filter-bar">
+      <select id="filtHistSuc" onchange="renderHistorico()">
+        <option value="">Todas las sucursales</option>
+        <option>Corporativo</option><option>Cedis</option><option>Hidalgo</option>
+        <option>Construcasa</option><option>Ferrocarril</option><option>Simbolos</option>
+        <option>Santa Rosa</option><option>Atzompa</option><option>Viguera</option>
+        <option>Reforma</option><option>Tehuantepec</option><option>Puerto Escondido</option>
+      </select>
+      <input type="date" id="filtHistDesde" onchange="renderHistorico()">
+      <input type="date" id="filtHistHasta" onchange="renderHistorico()">
+      <input type="text" id="filtHistBus" placeholder="Buscar…" oninput="renderHistorico()" style="min-width:160px">
+      <button class="btn-export" onclick="exportarHistCSV()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        CSV
+      </button>
+    </div>
+    <div class="card">
+      <div class="card-title">Incidencias resueltas</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Apertura</th><th>Cierre</th><th>Equipo</th><th>Sucursal</th><th>Colaborador</th><th>Técnico</th><th>Tiempo</th><th>Descripción</th><th>Bitácora</th></tr></thead>
+          <tbody id="tablaHist"></tbody>
+        </table>
+        <div id="emptyHist" class="empty" style="display:none"><div class="e-icon">📋</div>Sin incidencias resueltas.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ REPORTES ══ -->
+  <div id="reportes" class="section">
+    <div class="page-header"><h2>Reportes</h2></div>
+    <div class="filter-bar">
+      <div class="period-pills">
+        <button class="period-pill active" onclick="setRepPeriodo('dia',this)">Día</button>
+        <button class="period-pill" onclick="setRepPeriodo('semana',this)">Semana</button>
+        <button class="period-pill" onclick="setRepPeriodo('mes',this)">Mes</button>
+        <button class="period-pill" onclick="setRepPeriodo('custom',this)">Personalizado</button>
+      </div>
+      <div id="repCustomRange" style="display:none;gap:8px;align-items:center;display:none">
+        <input type="date" id="repDesde">
+        <input type="date" id="repHasta">
+        <button class="btn btn-sm btn-primary" onclick="renderReportes()">Aplicar</button>
+      </div>
+    </div>
+    <div class="metrics-grid">
+      <div class="metric"><div class="metric-label">Incidencias en periodo</div><div class="metric-value info" id="rTotal">0</div></div>
+      <div class="metric"><div class="metric-label">Equipos afectados</div><div class="metric-value warn" id="rEquipos">0</div></div>
+      <div class="metric"><div class="metric-label">Técnicos activos</div><div class="metric-value" id="rTecnicos">0</div></div>
+      <div class="metric"><div class="metric-label">MTTR promedio</div><div class="metric-value ok" id="rMTTR">—</div></div>
+    </div>
+    <div class="two-col" style="margin-bottom:16px">
+      <div class="card"><div class="card-title">Incidencias por día</div><div style="position:relative;height:220px"><canvas id="graficaRep"></canvas></div></div>
+      <div class="card"><div class="card-title">Top sucursales</div><div class="branch-list" id="repBranchBars"><div class="empty">Sin datos.</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Detalle</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn-export" onclick="exportarRepCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar CSV
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Fecha</th><th>Equipo</th><th>Sucursal</th><th>Técnico</th><th>Estado</th><th>Tiempo</th><th>Descripción</th></tr></thead>
+          <tbody id="tablaRep"></tbody>
+        </table>
+        <div id="emptyRep" class="empty" style="display:none"><div class="e-icon">📈</div>Sin datos en este periodo.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CONFIGURACIÓN ══ -->
+  <div id="config" class="section">
+    <div class="page-header"><h2>Configuración</h2></div>
+    <div class="card" style="max-width:560px">
+      <div class="card-title">⚙️ Frecuencia de mantenimiento por sucursal</div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:16px">Define cada cuántos días se programa el mantenimiento preventivo para cada sucursal. Al registrar o actualizar un mantenimiento se usará este valor para calcular la próxima fecha.</p>
+      <div id="configSucursales"></div>
+      <div class="btn-bar"><button class="btn btn-primary" onclick="guardarConfig()">Guardar configuración</button></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- MODAL EQUIPO -->
+<div class="modal-overlay" id="modalEquipo">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title" id="modalEquipoTitulo">Agregar equipo</div><div class="modal-sub">Completa la información del equipo</div></div>
+      <button class="modal-close" onclick="cerrarModalEquipo()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">Información general</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Sucursal *</label>
+            <select id="eqSucursal">
+              <option value="">Selecciona</option>
+              <option>Corporativo</option><option>Cedis</option><option>Hidalgo</option>
+              <option>Construcasa</option><option>Ferrocarril</option><option>Simbolos</option>
+              <option>Santa Rosa</option><option>Atzompa</option><option>Viguera</option>
+              <option>Reforma</option><option>Tehuantepec</option><option>Puerto Escondido</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Tipo de equipo *</label>
+            <select id="eqTipo"><option value="">Selecciona</option><option>Desktop</option><option>Laptop</option></select>
+          </div>
+          <div class="form-group span2"><label>Colaborador asignado *</label><input id="eqColaborador" placeholder="Nombre completo del colaborador"></div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Equipo principal</div>
+        <div class="form-grid-3">
+          <div class="form-group"><label>Marca *</label><input id="eqMarca" placeholder="Ej. Dell, HP, Lenovo"></div>
+          <div class="form-group"><label>Modelo</label><input id="eqModelo" placeholder="Ej. OptiPlex 7090"></div>
+          <div class="form-group"><label>Color</label><input id="eqColor" placeholder="Ej. Negro"></div>
+          <div class="form-group"><label>Procesador</label><input id="eqProcesador" placeholder="Ej. Intel i5-12400"></div>
+          <div class="form-group"><label>Sistema Operativo</label><input id="eqSO" placeholder="Ej. Windows 11 Pro"></div>
+          <div class="form-group"><label>RAM</label><input id="eqRAM" placeholder="Ej. 16 GB"></div>
+          <div class="form-group"><label>SSD / Disco</label><input id="eqSSD" placeholder="Ej. 512 GB SSD"></div>
+          <div class="form-group"><label>No. Serie (equipo)</label><input id="eqSN" placeholder="SN del equipo"></div>
+          <div class="form-group"><label>Paquetería</label><input id="eqPaqueteria" placeholder="Ej. Office 365"></div>
+          <div class="form-group"><label>IP</label><input id="eqIP" placeholder="Ej. 192.168.1.100"></div>
+          <div class="form-group"><label>Estado</label>
+            <select id="eqEstado"><option>Activo</option><option>Falla</option><option>Mantenimiento</option><option>Baja</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Periféricos</div>
+        <div class="form-grid-3">
+          <div class="form-group"><label>Monitor</label><input id="eqMonitor" placeholder="Marca/Modelo"></div>
+          <div class="form-group"><label>SN Monitor</label><input id="eqMonitorSN" placeholder="No. Serie"></div>
+          <div class="form-group"></div>
+          <div class="form-group"><label>Teclado</label><input id="eqTeclado" placeholder="Marca/Modelo"></div>
+          <div class="form-group"><label>SN Teclado</label><input id="eqTecladoSN" placeholder="No. Serie"></div>
+          <div class="form-group"></div>
+          <div class="form-group"><label>Mouse</label><input id="eqMouse" placeholder="Marca/Modelo"></div>
+          <div class="form-group"><label>SN Mouse</label><input id="eqMouseSN" placeholder="No. Serie"></div>
+          <div class="form-group"></div>
+          <div class="form-group"><label>Teléfono</label><input id="eqTelefono" placeholder="Marca/Modelo/Ext"></div>
+          <div class="form-group"><label>SN Teléfono</label><input id="eqTelefonoSN" placeholder="No. Serie"></div>
+          <div class="form-group"></div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Mantenimiento preventivo</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Último mantenimiento</label><input type="date" id="eqUltimoMant"></div>
+          <div class="form-group"><label>Notas</label><input id="eqNotas" placeholder="Observaciones generales"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="cerrarModalEquipo()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEquipo()">Guardar equipo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE EQUIPO -->
+<div class="modal-overlay" id="modalDetalle">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title" id="detalleTitulo">—</div><div class="modal-sub" id="detalleSubtitulo">—</div></div>
+      <button class="modal-close" onclick="cerrarModalDetalle()">×</button>
+    </div>
+    <div class="modal-body" id="detalleBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="cerrarModalDetalle()">Cerrar</button>
+      <button class="btn btn-outline" id="detalleEditBtn">Editar equipo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL BITÁCORA -->
+<div class="modal-overlay" id="modalBitacora">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="bitaTitulo">Bitácora</div><div class="modal-sub" id="bitaSubtitulo"></div></div>
+      <button class="modal-close" onclick="cerrarModalBitacora()">×</button>
+    </div>
+    <div class="modal-body"><div class="timeline" id="bitaTimeline"><div class="empty">Sin entradas.</div></div></div>
+    <div class="modal-footer" id="bitaFooter" style="align-items:flex-end">
+      <div class="form-group" style="flex:1"><textarea id="bitaComentario" rows="2" placeholder="Agregar comentario… (Ctrl+Enter)"></textarea></div>
+      <button class="btn btn-primary" onclick="guardarComentario()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MANTENIMIENTO -->
+<div class="modal-overlay" id="modalMant">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="mantTitulo">Registrar mantenimiento</div><div class="modal-sub" id="mantSubtitulo"></div></div>
+      <button class="modal-close" onclick="document.getElementById('modalMant').classList.remove('open')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:10px"><label>Fecha del mantenimiento</label><input type="date" id="mantFecha"></div>
+      <div class="form-group" style="margin-bottom:10px"><label>Técnico</label><input id="mantTecnico" placeholder="Nombre del técnico"></div>
+      <div class="form-group"><label>Observaciones</label><textarea id="mantObs" rows="3" placeholder="Qué se revisó, qué se encontró…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="document.getElementById('modalMant').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarMantenimiento()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBVs7GnPPChdilJSk99WG1IPeLJKvEjxVc",
+  authDomain: "camaras-control.firebaseapp.com",
+  projectId: "camaras-control"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const SUCURSALES = ['Corporativo','Cedis','Hidalgo','Construcasa','Ferrocarril','Simbolos','Santa Rosa','Atzompa','Viguera','Reforma','Tehuantepec','Puerto Escondido'];
+const DIAS_INC_ESTANCADA = 5;
+const DIAS_EQUIPO_FALLA  = 7;
+const DIAS_MANT_PROXIMO  = 30;
+
+let equiposCache = [];
+let incidenciasCache = [];
+let configCache = {};
+let chartTipo = null;
+let chartRep  = null;
+let editEquipoId = null;
+let modalMantEquipoId = null;
+let modalBitaIncId = null;
+let unsubBitacora = null;
+let repPeriodo = 'mes';
+
+/* ── utils ── */
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+function mostrar(sec, btn) {
+  document.querySelectorAll('.section').forEach(el => el.classList.remove('visible'));
+  document.querySelectorAll('.sidebar nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(sec).classList.add('visible');
+  if (btn) btn.classList.add('active');
+  if (sec === 'mantenimiento') renderMantenimiento();
+  if (sec === 'alertas') renderAlertas();
+  if (sec === 'historico') renderHistorico();
+  if (sec === 'reportes') renderReportes();
+  if (sec === 'config') renderConfig();
+}
+function fmtFecha(ts) {
+  if (!ts) return '—';
+  return ts.toDate ? ts.toDate().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+}
+function fmtHora(ts) {
+  if (!ts) return '—';
+  return ts.toDate ? ts.toDate().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : '—';
+}
+function diasDesde(ts) {
+  if (!ts) return 9999;
+  return (Date.now() - ts.toDate().getTime()) / 86400000;
+}
+function calcTiempo(f, fc) {
+  if (!f || !fc) return null;
+  const ms = fc.toDate() - f.toDate();
+  if (ms < 0) return null;
+  const m = Math.floor(ms/60000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m/60), rm = m%60;
+  if (h < 24) return rm ? `${h}h ${rm}m` : `${h}h`;
+  const d = Math.floor(h/24), rh = h%24;
+  return rh ? `${d}d ${rh}h` : `${d}d`;
+}
+function msToLabel(ms) {
+  const m = Math.floor(ms/60000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m/60), rm = m%60;
+  if (h < 24) return rm ? `${h}h ${rm}m` : `${h}h`;
+  const d = Math.floor(h/24), rh = h%24;
+  return rh ? `${d}d ${rh}h` : `${d}d`;
+}
+function chipInc(estado) {
+  const m = {abierta:'chip-falla','en proceso':'chip-mant',resuelta:'chip-activo'};
+  return `<span class="chip ${m[estado]||'chip-falla'}">${estado}</span>`;
+}
+function chipEquipo(tipo) {
+  return tipo === 'Laptop'
+    ? `<span class="chip chip-laptop">💻 Laptop</span>`
+    : `<span class="chip chip-desktop">🖥 Desktop</span>`;
+}
+function chipEstado(est) {
+  const m = {Activo:'chip-activo',Falla:'chip-falla',Mantenimiento:'chip-mant',Baja:'chip-baja'};
+  return `<span class="chip ${m[est]||'chip-baja'}">${est}</span>`;
+}
+
+/* ── MODAL EQUIPO ── */
+function abrirModalEquipo(id) {
+  editEquipoId = id || null;
+  const campos = ['eqSucursal','eqTipo','eqColaborador','eqMarca','eqModelo','eqColor',
+    'eqProcesador','eqSO','eqRAM','eqSSD','eqSN','eqPaqueteria','eqIP',
+    'eqMonitor','eqMonitorSN','eqTeclado','eqTecladoSN','eqMouse','eqMouseSN',
+    'eqTelefono','eqTelefonoSN','eqNotas'];
+  if (id) {
+    const eq = equiposCache.find(e => e.id === id);
+    if (!eq) return;
+    document.getElementById('modalEquipoTitulo').textContent = 'Editar equipo';
+    campos.forEach(c => { const el = document.getElementById(c); if (el) el.value = eq[c.replace('eq','').toLowerCase()] ?? eq[c.slice(2,3).toLowerCase()+c.slice(3)] ?? ''; });
+    // Map fields properly
+    document.getElementById('eqSucursal').value  = eq.sucursal||'';
+    document.getElementById('eqTipo').value       = eq.tipo||'';
+    document.getElementById('eqColaborador').value = eq.colaborador||'';
+    document.getElementById('eqMarca').value      = eq.marca||'';
+    document.getElementById('eqModelo').value     = eq.modelo||'';
+    document.getElementById('eqColor').value      = eq.color||'';
+    document.getElementById('eqProcesador').value = eq.procesador||'';
+    document.getElementById('eqSO').value         = eq.so||'';
+    document.getElementById('eqRAM').value        = eq.ram||'';
+    document.getElementById('eqSSD').value        = eq.ssd||'';
+    document.getElementById('eqSN').value         = eq.sn||'';
+    document.getElementById('eqPaqueteria').value = eq.paqueteria||'';
+    document.getElementById('eqIP').value         = eq.ip||'';
+    document.getElementById('eqEstado').value     = eq.estado||'Activo';
+    document.getElementById('eqMonitor').value    = eq.monitor||'';
+    document.getElementById('eqMonitorSN').value  = eq.monitorSN||'';
+    document.getElementById('eqTeclado').value    = eq.teclado||'';
+    document.getElementById('eqTecladoSN').value  = eq.tecladoSN||'';
+    document.getElementById('eqMouse').value      = eq.mouse||'';
+    document.getElementById('eqMouseSN').value    = eq.mouseSN||'';
+    document.getElementById('eqTelefono').value   = eq.telefono||'';
+    document.getElementById('eqTelefonoSN').value = eq.telefonoSN||'';
+    document.getElementById('eqNotas').value      = eq.notas||'';
+    if (eq.ultimoMant) {
+      const d = eq.ultimoMant.toDate();
+      document.getElementById('eqUltimoMant').value = d.toISOString().slice(0,10);
+    } else document.getElementById('eqUltimoMant').value = '';
+  } else {
+    document.getElementById('modalEquipoTitulo').textContent = 'Agregar equipo';
+    ['eqSucursal','eqTipo','eqColaborador','eqMarca','eqModelo','eqColor','eqProcesador','eqSO','eqRAM','eqSSD','eqSN','eqPaqueteria','eqIP','eqMonitor','eqMonitorSN','eqTeclado','eqTecladoSN','eqMouse','eqMouseSN','eqTelefono','eqTelefonoSN','eqNotas','eqUltimoMant'].forEach(c => { const el=document.getElementById(c); if(el) el.value=''; });
+    document.getElementById('eqEstado').value = 'Activo';
+  }
+  document.getElementById('modalEquipo').classList.add('open');
+}
+function cerrarModalEquipo() { document.getElementById('modalEquipo').classList.remove('open'); editEquipoId = null; }
+
+function guardarEquipo() {
+  const suc = document.getElementById('eqSucursal').value;
+  const tipo = document.getElementById('eqTipo').value;
+  const col  = document.getElementById('eqColaborador').value.trim();
+  const marc = document.getElementById('eqMarca').value.trim();
+  if (!suc||!tipo||!col||!marc) { toast('⚠ Completa sucursal, tipo, colaborador y marca.'); return; }
+  const umVal = document.getElementById('eqUltimoMant').value;
+  const data = {
+    sucursal: suc, tipo, colaborador: col,
+    marca: marc,
+    modelo: document.getElementById('eqModelo').value.trim(),
+    color: document.getElementById('eqColor').value.trim(),
+    procesador: document.getElementById('eqProcesador').value.trim(),
+    so: document.getElementById('eqSO').value.trim(),
+    ram: document.getElementById('eqRAM').value.trim(),
+    ssd: document.getElementById('eqSSD').value.trim(),
+    sn: document.getElementById('eqSN').value.trim(),
+    paqueteria: document.getElementById('eqPaqueteria').value.trim(),
+    ip: document.getElementById('eqIP').value.trim(),
+    estado: document.getElementById('eqEstado').value,
+    monitor: document.getElementById('eqMonitor').value.trim(),
+    monitorSN: document.getElementById('eqMonitorSN').value.trim(),
+    teclado: document.getElementById('eqTeclado').value.trim(),
+    tecladoSN: document.getElementById('eqTecladoSN').value.trim(),
+    mouse: document.getElementById('eqMouse').value.trim(),
+    mouseSN: document.getElementById('eqMouseSN').value.trim(),
+    telefono: document.getElementById('eqTelefono').value.trim(),
+    telefonoSN: document.getElementById('eqTelefonoSN').value.trim(),
+    notas: document.getElementById('eqNotas').value.trim(),
+    ultimoMant: umVal ? firebase.firestore.Timestamp.fromDate(new Date(umVal)) : null
+  };
+  const op = editEquipoId
+    ? db.collection('computos').doc(editEquipoId).update(data)
+    : db.collection('computos').add(data);
+  op.then(() => { toast(editEquipoId ? '✅ Equipo actualizado.' : '✅ Equipo registrado.'); cerrarModalEquipo(); })
+    .catch(() => toast('Error al guardar.'));
+}
+
+function eliminarEquipo(id) {
+  if (!confirm('¿Eliminar este equipo?')) return;
+  db.collection('computos').doc(id).delete().then(() => toast('Equipo eliminado.')).catch(() => toast('Error.'));
+}
+
+/* ── DETALLE EQUIPO ── */
+function verDetalle(id) {
+  const eq = equiposCache.find(e => e.id === id);
+  if (!eq) return;
+  document.getElementById('detalleTitulo').textContent = `${eq.marca} ${eq.modelo||''}`;
+  document.getElementById('detalleSubtitulo').textContent = `${eq.tipo} · ${eq.sucursal} · ${eq.colaborador}`;
+  document.getElementById('detalleEditBtn').onclick = () => { cerrarModalDetalle(); abrirModalEquipo(id); };
+  const items = [
+    {l:'Tipo',v:eq.tipo},{l:'Sucursal',v:eq.sucursal},{l:'Colaborador',v:eq.colaborador,h:true},
+    {l:'Marca',v:eq.marca},{l:'Modelo',v:eq.modelo},{l:'Color',v:eq.color},
+    {l:'Procesador',v:eq.procesador},{l:'S.O',v:eq.so},{l:'RAM',v:eq.ram},
+    {l:'SSD/Disco',v:eq.ssd},{l:'No. Serie',v:eq.sn},{l:'Paquetería',v:eq.paqueteria},
+    {l:'IP',v:eq.ip},{l:'Estado',v:chipEstado(eq.estado||'Activo'),raw:true},{l:'Último Mant.',v:fmtFecha(eq.ultimoMant)},
+    {l:'Monitor',v:eq.monitor},{l:'SN Monitor',v:eq.monitorSN},{l:''},
+    {l:'Teclado',v:eq.teclado},{l:'SN Teclado',v:eq.tecladoSN},{l:''},
+    {l:'Mouse',v:eq.mouse},{l:'SN Mouse',v:eq.mouseSN},{l:''},
+    {l:'Teléfono',v:eq.telefono},{l:'SN Teléfono',v:eq.telefonoSN},{l:''},
+  ];
+  document.getElementById('detalleBody').innerHTML = `
+    <div class="detail-grid">
+      ${items.map(i=>i.l?`<div class="detail-item ${i.h?'highlight':''}"><div class="detail-label">${i.l}</div><div class="detail-value">${i.raw?i.v:(i.v||'—')}</div></div>`:'<div></div>').join('')}
+    </div>
+    ${eq.notas?`<div style="background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:13px;color:#64748b"><strong>Notas:</strong> ${eq.notas}</div>`:''}`;
+  document.getElementById('modalDetalle').classList.add('open');
+}
+function cerrarModalDetalle() { document.getElementById('modalDetalle').classList.remove('open'); }
+
+/* ── INCIDENCIAS ── */
+function cargarEquiposInc() {
+  const suc = document.getElementById('incSuc').value;
+  const step = document.getElementById('incEquipoStep');
+  clearIncEquipo();
+  if (!suc) { step.style.display='none'; return; }
+  step.style.display='block';
+  const equipos = equiposCache.filter(e => e.sucursal === suc && e.estado !== 'Baja');
+  const grid = document.getElementById('incEquipoGrid');
+  if (!equipos.length) { grid.innerHTML='<div style="font-size:13px;color:#94a3b8;grid-column:span 2">Sin equipos en esta sucursal.</div>'; return; }
+  grid.innerHTML = equipos.map(e => `
+    <button onclick="selectIncEquipo('${e.id}','${(e.marca+' '+(e.modelo||'')).trim().replace(/'/g,"\\'")}','${e.colaborador.replace(/'/g,"\\'")}','${e.estado}',this)"
+      style="padding:8px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:500;cursor:pointer;text-align:left;transition:all .12s">
+      ${e.tipo==='Laptop'?'💻':'🖥'} ${e.marca} ${e.modelo||''}
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${e.colaborador} ${e.estado==='Falla'?'<span style="color:#ef4444">⚠ en falla</span>':''}</div>
+    </button>`).join('');
+}
+function selectIncEquipo(id, nombre, colaborador, estado, btn) {
+  document.querySelectorAll('#incEquipoGrid button').forEach(b => { b.style.borderColor='#e2e8f0'; b.style.background='white'; b.style.color=''; });
+  btn.style.borderColor='#6366f1'; btn.style.background='#ede9fe'; btn.style.color='#3730a3';
+  document.getElementById('incEquipoId').value = id;
+  document.getElementById('incEquipoNombre').value = nombre;
+  document.getElementById('incColaborador').value = colaborador;
+  document.getElementById('incEquipoLabel').textContent = `${nombre} · ${colaborador}`;
+  document.getElementById('incEquipoSelWrap').style.display='block';
+  document.getElementById('incRestoForm').style.display='block';
+}
+function clearIncEquipo() {
+  document.getElementById('incEquipoId').value='';
+  document.getElementById('incEquipoNombre').value='';
+  document.getElementById('incColaborador').value='';
+  document.getElementById('incEquipoSelWrap').style.display='none';
+  document.getElementById('incRestoForm').style.display='none';
+  document.querySelectorAll('#incEquipoGrid button').forEach(b => { b.style.borderColor='#e2e8f0'; b.style.background='white'; b.style.color=''; });
+}
+function addInc() {
+  const suc   = document.getElementById('incSuc').value;
+  const eqId  = document.getElementById('incEquipoId').value;
+  const eqNom = document.getElementById('incEquipoNombre').value;
+  const col   = document.getElementById('incColaborador').value;
+  const tec   = document.getElementById('incTecnico').value.trim();
+  const desc  = document.getElementById('incDesc').value.trim();
+  if (!suc||!eqId||!tec||!desc) { toast('⚠ Completa todos los campos.'); return; }
+  db.collection('comp_incidencias').add({
+    sucursal:suc, equipoId:eqId, equipo:eqNom, colaborador:col,
+    tecnico:tec, descripcion:desc, estado:'abierta',
+    fecha:firebase.firestore.FieldValue.serverTimestamp(), fechaCierre:null
+  }).then(() => {
+    db.collection('computos').doc(eqId).update({estado:'Falla'});
+    toast('✅ Incidencia registrada. Equipo marcado como Falla.');
+    document.getElementById('incTecnico').value='';
+    document.getElementById('incDesc').value='';
+    clearIncEquipo();
+    document.getElementById('incSuc').value='';
+    document.getElementById('incEquipoStep').style.display='none';
+  }).catch(() => toast('Error al guardar.'));
+}
+function avanzarEstado(id, estadoActual, equipoId) {
+  const sig = estadoActual==='abierta'?'en proceso':'resuelta';
+  const upd = {estado:sig};
+  if (sig==='resuelta') {
+    upd.fechaCierre = firebase.firestore.FieldValue.serverTimestamp();
+    if (equipoId) db.collection('computos').doc(equipoId).update({estado:'Activo'});
+  }
+  db.collection('comp_incidencias').doc(id).update(upd).then(() => {
+    db.collection('comp_incidencias').doc(id).collection('bitacora').add({
+      texto: sig==='resuelta'?'✅ Incidencia resuelta. Equipo marcado como Activo.':'🔧 Incidencia iniciada / en proceso.',
+      tipo:'sistema', fecha:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast(sig==='resuelta'?'✅ Resuelta. Equipo activo.':'🔧 En proceso.');
+  }).catch(() => toast('Error.'));
+}
+function btnAvanzar(id, estado, eqId) {
+  if (estado==='resuelta') return '—';
+  const label = estado==='abierta'?'Iniciar':'Resolver';
+  const cls   = estado==='abierta'?'btn-amber':'btn-success';
+  return `<button class="btn btn-sm ${cls}" onclick="avanzarEstado('${id}','${estado}','${eqId||''}')">${label}</button>`;
+}
+
+/* ── RENDERS ── */
+function renderDashboard() {
+  const total = equiposCache.length;
+  const fallas = equiposCache.filter(e=>e.estado==='Falla').length;
+  const op = equiposCache.filter(e=>e.estado==='Activo').length;
+  document.getElementById('dTotal').textContent = total;
+  document.getElementById('dOperativos').textContent = op;
+  document.getElementById('dFallas').textContent = fallas;
+  document.getElementById('dPctOp').textContent = total?`${Math.round(op/total*100)}% del total`:'';
+  document.getElementById('dPctFalla').textContent = total?`${Math.round(fallas/total*100)}% del total`:'';
+
+  // Mantenimiento pendiente
+  const hoy = new Date();
+  let mantPend = 0;
+  equiposCache.forEach(e => {
+    const freq = configCache[e.sucursal] || 90;
+    if (!e.ultimoMant) { mantPend++; return; }
+    const prox = new Date(e.ultimoMant.toDate().getTime() + freq*86400000);
+    const diff = (prox - hoy)/86400000;
+    if (diff <= DIAS_MANT_PROXIMO) mantPend++;
+  });
+  document.getElementById('dMant').textContent = mantPend;
+
+  // Chart tipo
+  const laptops = equiposCache.filter(e=>e.tipo==='Laptop').length;
+  const desktops = equiposCache.filter(e=>e.tipo==='Desktop').length;
+  if (chartTipo) chartTipo.destroy();
+  chartTipo = new Chart(document.getElementById('graficaTipo'), {
+    type:'doughnut',
+    data:{labels:['Desktop','Laptop','Falla','Mant.'],datasets:[{data:[desktops-equiposCache.filter(e=>e.tipo==='Desktop'&&e.estado==='Falla').length,laptops-equiposCache.filter(e=>e.tipo==='Laptop'&&e.estado==='Falla').length,fallas,equiposCache.filter(e=>e.estado==='Mantenimiento').length],backgroundColor:['#6366f1','#8b5cf6','#dc2626','#d97706'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}
+  });
+
+  // Branch bars
+  const porSuc = {};
+  equiposCache.forEach(e=>{ if(!porSuc[e.sucursal])porSuc[e.sucursal]={total:0,falla:0}; porSuc[e.sucursal].total++; if(e.estado==='Falla')porSuc[e.sucursal].falla++; });
+  const maxT = Math.max(...Object.values(porSuc).map(v=>v.total),1);
+  document.getElementById('branchBars').innerHTML = Object.entries(porSuc).sort((a,b)=>b[1].total-a[1].total).map(([n,v])=>`
+    <div class="branch-row">
+      <div class="branch-name">${n}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v.total/maxT*100)}%;background:#6366f1"></div></div>
+      <div class="branch-count">${v.total}</div>
+    </div>`).join('') || '<div class="empty">Sin datos.</div>';
+
+  // Inc abiertas
+  const abiertas = incidenciasCache.filter(i=>i.estado!=='resuelta');
+  document.getElementById('dIncAbiertas').textContent = abiertas.length;
+  const tbodyD = document.getElementById('tablaIncDash');
+  const emptyD = document.getElementById('emptyIncDash');
+  if (!abiertas.length) { tbodyD.innerHTML=''; emptyD.style.display='block'; }
+  else {
+    emptyD.style.display='none';
+    tbodyD.innerHTML = abiertas.sort((a,b)=>{ const da=a.fecha?a.fecha.toDate():new Date(0),db2=b.fecha?b.fecha.toDate():new Date(0); return db2-da; }).map(i=>`<tr>
+      <td>${i.sucursal||'—'}</td><td><strong>${i.equipo||'—'}</strong></td><td>${i.colaborador||'—'}</td><td>${i.tecnico||'—'}</td>
+      <td>${chipInc(i.estado||'abierta')}</td>
+      <td style="color:${diasDesde(i.fecha)>=DIAS_INC_ESTANCADA?'#dc2626':'#64748b'}">${Math.floor(diasDesde(i.fecha))}d</td>
+      <td style="display:flex;gap:5px">${btnAvanzar(i.id,i.estado||'abierta',i.equipoId)}<button class="btn btn-sm btn-gray" onclick="abrirBitacora('${i.id}','${(i.equipo||'').replace(/'/g,"\\'")}','${i.estado||'abierta'}')">📋</button></td>
+    </tr>`).join('');
+  }
+}
+
+function renderInventario() {
+  const fSuc = document.getElementById('filtInvSuc').value;
+  const fTipo = document.getElementById('filtInvTipo').value;
+  const fEst = document.getElementById('filtInvEstado').value;
+  const fBus = document.getElementById('filtInvBusqueda').value.toLowerCase();
+  const hoy = new Date();
+  let data = equiposCache.filter(e=>{
+    if (fSuc && e.sucursal!==fSuc) return false;
+    if (fTipo && e.tipo!==fTipo) return false;
+    if (fEst && e.estado!==fEst) return false;
+    if (fBus && ![(e.colaborador||''),(e.marca||''),(e.modelo||''),(e.sn||''),(e.ip||'')].join(' ').toLowerCase().includes(fBus)) return false;
+    return true;
+  });
+  document.getElementById('invContador').textContent = `${data.length} equipo(s)`;
+  const tbody = document.getElementById('tablaInventario');
+  const empty = document.getElementById('emptyInv');
+  if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  tbody.innerHTML = data.map(e=>{
+    const freq = configCache[e.sucursal]||90;
+    let proxMantLabel = '—', proxMantColor = '#94a3b8';
+    if (e.ultimoMant) {
+      const prox = new Date(e.ultimoMant.toDate().getTime()+freq*86400000);
+      const diff = Math.ceil((prox-hoy)/86400000);
+      proxMantLabel = diff<=0?`Vencido ${Math.abs(diff)}d`:diff<=DIAS_MANT_PROXIMO?`En ${diff}d`:`En ${diff}d`;
+      proxMantColor = diff<=0?'#dc2626':diff<=DIAS_MANT_PROXIMO?'#d97706':'#16a34a';
+    } else { proxMantLabel='Sin programar'; }
+    return `<tr>
+      <td>${chipEquipo(e.tipo)}</td>
+      <td>${e.sucursal}</td>
+      <td><strong>${e.colaborador}</strong></td>
+      <td>${e.marca} ${e.modelo||''}</td>
+      <td style="font-size:12px;color:#64748b">${e.so||'—'}</td>
+      <td style="font-size:12px;color:#64748b">${e.ip||'—'}</td>
+      <td>${chipEstado(e.estado||'Activo')}</td>
+      <td style="font-size:12px;font-weight:500;color:${proxMantColor}">${proxMantLabel}</td>
+      <td>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-gray" onclick="verDetalle('${e.id}')">Ver</button>
+          <button class="btn btn-sm btn-outline" onclick="abrirModalEquipo('${e.id}')">Editar</button>
+          <button class="btn btn-sm btn-amber" onclick="abrirModalMant('${e.id}')">Mant.</button>
+          <button class="btn btn-sm btn-danger" onclick="eliminarEquipo('${e.id}')">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTablaInc() {
+  const fEst = document.getElementById('filtIncEstado').value;
+  const fSuc = document.getElementById('filtIncSuc').value;
+  let data = incidenciasCache.filter(i=>{
+    if (fEst && (i.estado||'abierta')!==fEst) return false;
+    if (fSuc && i.sucursal!==fSuc) return false;
+    return true;
+  }).sort((a,b)=>{ const da=a.fecha?a.fecha.toDate():new Date(0),db2=b.fecha?b.fecha.toDate():new Date(0); return db2-da; });
+  const tbody=document.getElementById('tablaInc'), empty=document.getElementById('emptyInc');
+  if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  tbody.innerHTML=data.map(i=>`<tr>
+    <td>${i.sucursal||'—'}</td><td><strong>${i.equipo||'—'}</strong></td>
+    <td>${i.colaborador||'—'}</td><td>${i.tecnico||'—'}</td>
+    <td>${chipInc(i.estado||'abierta')}</td>
+    <td style="font-size:12px;color:#64748b">${calcTiempo(i.fecha,i.fechaCierre)||'—'}</td>
+    <td>${fmtFecha(i.fecha)}</td>
+    <td style="display:flex;gap:5px">${btnAvanzar(i.id,i.estado||'abierta',i.equipoId)}<button class="btn btn-sm btn-gray" onclick="abrirBitacora('${i.id}','${(i.equipo||'').replace(/'/g,"\\'")}','${i.estado||'abierta'}')">📋 Bitácora</button></td>
+  </tr>`).join('');
+}
+
+function renderIncStats() {
+  const ab = incidenciasCache.filter(i=>(i.estado||'abierta')==='abierta').length;
+  const pr = incidenciasCache.filter(i=>i.estado==='en proceso').length;
+  const hoy=new Date(), mesInicio=new Date(hoy.getFullYear(),hoy.getMonth(),1);
+  const res=incidenciasCache.filter(i=>i.estado==='resuelta'&&i.fechaCierre&&i.fechaCierre.toDate()>=mesInicio).length;
+  document.getElementById('iStatAbiertas').textContent=ab;
+  document.getElementById('iStatProceso').textContent=pr;
+  document.getElementById('iStatResueltas').textContent=res;
+  const tiempos=incidenciasCache.filter(i=>i.estado==='resuelta'&&i.fecha&&i.fechaCierre).map(i=>i.fechaCierre.toDate()-i.fecha.toDate()).filter(m=>m>0);
+  document.getElementById('iStatMTTR').textContent=tiempos.length?msToLabel(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):'—';
+}
+
+/* ── MANTENIMIENTO ── */
+function abrirModalMant(eqId) {
+  modalMantEquipoId = eqId;
+  const eq = equiposCache.find(e=>e.id===eqId);
+  document.getElementById('mantTitulo').textContent = 'Registrar mantenimiento';
+  document.getElementById('mantSubtitulo').textContent = eq ? `${eq.marca} ${eq.modelo||''} · ${eq.colaborador}` : '';
+  document.getElementById('mantFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mantTecnico').value='';
+  document.getElementById('mantObs').value='';
+  document.getElementById('modalMant').classList.add('open');
+}
+function guardarMantenimiento() {
+  const fecha = document.getElementById('mantFecha').value;
+  const tec   = document.getElementById('mantTecnico').value.trim();
+  const obs   = document.getElementById('mantObs').value.trim();
+  if (!fecha||!tec) { toast('⚠ Completa fecha y técnico.'); return; }
+  const ts = firebase.firestore.Timestamp.fromDate(new Date(fecha));
+  db.collection('computos').doc(modalMantEquipoId).update({
+    ultimoMant: ts, estado:'Activo'
+  }).then(() => {
+    db.collection('comp_mantenimientos').add({
+      equipoId: modalMantEquipoId, fecha: ts, tecnico: tec, observaciones: obs,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('✅ Mantenimiento registrado.');
+    document.getElementById('modalMant').classList.remove('open');
+  }).catch(() => toast('Error.'));
+}
+
+function renderMantenimiento() {
+  const fSuc = document.getElementById('filtMantSuc').value;
+  const fStatus = document.getElementById('filtMantStatus').value;
+  const hoy = new Date();
+  let data = equiposCache.filter(e => {
+    if (fSuc && e.sucursal!==fSuc) return false;
+    if (e.estado==='Baja') return false;
+    const freq = configCache[e.sucursal]||90;
+    if (!e.ultimoMant) { return !fStatus || fStatus==='sin'; }
+    const prox = new Date(e.ultimoMant.toDate().getTime()+freq*86400000);
+    const diff = (prox-hoy)/86400000;
+    if (fStatus==='vencido' && diff>0) return false;
+    if (fStatus==='proximo' && (diff<=0||diff>DIAS_MANT_PROXIMO)) return false;
+    if (fStatus==='ok' && diff<=DIAS_MANT_PROXIMO) return false;
+    if (fStatus==='sin') return false;
+    return true;
+  });
+  const grid = document.getElementById('mantGrid');
+  if (!data.length) { grid.innerHTML='<div class="empty"><div class="e-icon">📅</div>Sin equipos con los filtros aplicados.</div>'; return; }
+  grid.innerHTML = data.map(e => {
+    const freq = configCache[e.sucursal]||90;
+    let label='Sin programar', cls='mant-sin-prog', pct=0, proxStr='';
+    if (e.ultimoMant) {
+      const um = e.ultimoMant.toDate();
+      const prox = new Date(um.getTime()+freq*86400000);
+      const diff = Math.ceil((prox-hoy)/86400000);
+      const elapsed = freq - diff;
+      pct = Math.min(100,Math.max(0,Math.round(elapsed/freq*100)));
+      proxStr = prox.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+      if (diff<=0) { label=`Vencido ${Math.abs(diff)}d`; cls='mant-vencido'; }
+      else if (diff<=DIAS_MANT_PROXIMO) { label=`En ${diff} días`; cls='mant-proximo'; }
+      else { label=`En ${diff} días`; cls='mant-ok'; }
+    }
+    return `<div class="mant-card">
+      <div class="mant-header">
+        <div>
+          <div class="mant-equipo">${chipEquipo(e.tipo)} ${e.marca} ${e.modelo||''}</div>
+          <div class="mant-sucursal">${e.sucursal} · ${e.colaborador}</div>
+        </div>
+        <span class="mant-dias-badge ${cls}">${label}</span>
+      </div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">
+        Último: ${e.ultimoMant?fmtFecha(e.ultimoMant):'—'} &nbsp;|&nbsp; Frecuencia: ${freq}d
+        ${proxStr?`&nbsp;|&nbsp; Próximo: ${proxStr}`:''}
+      </div>
+      <div class="prog-bar-wrap">
+        <div class="prog-bar-track">
+          <div class="prog-bar-fill" style="width:${pct}%;background:${cls==='mant-vencido'?'#dc2626':cls==='mant-proximo'?'#d97706':'#16a34a'}"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <button class="btn btn-sm btn-primary" onclick="abrirModalMant('${e.id}')">Registrar mantenimiento</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── ALERTAS ── */
+function renderAlertas() {
+  const hoy = new Date();
+  const rojas=[], amarillas=[], azules=[];
+
+  incidenciasCache.filter(i=>i.estado!=='resuelta').forEach(i=>{
+    if (diasDesde(i.fecha)>=DIAS_INC_ESTANCADA)
+      rojas.push({title:`${i.equipo||'—'} · ${i.sucursal}`,sub:`Técnico: ${i.tecnico||'—'} · ${i.estado||'abierta'}`,label:`${Math.floor(diasDesde(i.fecha))}d sin mover`,id:i.id,eqNom:i.equipo||''});
+  });
+
+  equiposCache.forEach(e=>{
+    const freq=configCache[e.sucursal]||90;
+    if (!e.ultimoMant||e.estado==='Baja') {
+      if (!e.ultimoMant) amarillas.push({title:`${e.marca} ${e.modelo||''} · ${e.sucursal}`,sub:`${e.colaborador} · Sin mantenimiento registrado`,label:'Sin programar'});
+      return;
+    }
+    const prox=new Date(e.ultimoMant.toDate().getTime()+freq*86400000);
+    const diff=(prox-hoy)/86400000;
+    if (diff<=0) amarillas.push({title:`${e.marca} ${e.modelo||''} · ${e.sucursal}`,sub:`${e.colaborador} · Venció hace ${Math.abs(Math.ceil(diff))}d`,label:`Vencido ${Math.abs(Math.ceil(diff))}d`});
+    else if (diff<=DIAS_MANT_PROXIMO) amarillas.push({title:`${e.marca} ${e.modelo||''} · ${e.sucursal}`,sub:`${e.colaborador} · Próximo en ${Math.ceil(diff)} días`,label:`En ${Math.ceil(diff)}d`});
+  });
+
+  const eqsConIncActiva = new Set(incidenciasCache.filter(i=>i.estado!=='resuelta').map(i=>i.equipoId));
+  equiposCache.filter(e=>e.estado==='Falla'&&!eqsConIncActiva.has(e.id)).forEach(e=>{
+    azules.push({title:`${e.marca} ${e.modelo||''} · ${e.sucursal}`,sub:`${e.colaborador} · Falla sin incidencia activa`,label:'Sin incidencia'});
+  });
+
+  const total=rojas.length+amarillas.length+azules.length;
+  const badge=document.getElementById('sidebarBadge');
+  badge.textContent=total; badge.style.display=total?'inline-flex':'none';
+  document.getElementById('alertasTotalBadge').textContent=total;
+
+  // Dashboard widget
+  const dw=document.getElementById('dashAlertasWrap');
+  if (total>0) {
+    dw.style.display='block';
+    document.getElementById('dashAlertaTotal').textContent=total;
+    const tops=[...rojas.slice(0,2),...amarillas.slice(0,1),...azules.slice(0,1)];
+    document.getElementById('dashAlertasList').innerHTML=tops.map(a=>{
+      const c=rojas.includes(a)?'red':amarillas.includes(a)?'yellow':'blue';
+      return `<div class="alerta-item ${c}"><div class="alerta-body"><div class="alerta-title">${a.title}</div><div class="alerta-sub">${a.sub}</div></div><span class="alerta-dias ${c}">${a.label}</span></div>`;
+    }).join('')+(total>tops.length?`<div style="font-size:12px;color:#94a3b8;text-align:right;margin-top:6px">+${total-tops.length} más</div>`:'');
+  } else dw.style.display='none';
+
+  const panel=document.getElementById('alertasPanel');
+  if (!total){panel.innerHTML='<div class="empty"><div class="e-icon">✅</div>Sin alertas activas.</div>';return;}
+  let html='';
+  if (rojas.length) html+=`<div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔴 Incidencias estancadas (+${DIAS_INC_ESTANCADA} días) <span class="badge badge-danger">${rojas.length}</span></div>${rojas.map(a=>`<div class="alerta-item red"><div class="alerta-body"><div class="alerta-title">${a.title}</div><div class="alerta-sub">${a.sub}</div></div><span class="alerta-dias red">${a.label}</span>${a.id?`<button class="btn btn-sm btn-gray" onclick="abrirBitacora('${a.id}','${(a.eqNom||'').replace(/'/g,"\\'")}','abierta')">📋</button>`:''}</div>`).join('')}<br>`;
+  if (amarillas.length) html+=`<div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🟡 Mantenimiento vencido o próximo <span class="badge badge-warn">${amarillas.length}</span></div>${amarillas.map(a=>`<div class="alerta-item yellow"><div class="alerta-body"><div class="alerta-title">${a.title}</div><div class="alerta-sub">${a.sub}</div></div><span class="alerta-dias yellow">${a.label}</span></div>`).join('')}<br>`;
+  if (azules.length) html+=`<div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔵 Equipos en falla sin incidencia <span class="badge badge-info">${azules.length}</span></div>${azules.map(a=>`<div class="alerta-item blue"><div class="alerta-body"><div class="alerta-title">${a.title}</div><div class="alerta-sub">${a.sub}</div></div><span class="alerta-dias blue">${a.label}</span></div>`).join('')}`;
+  panel.innerHTML=html;
+}
+
+/* ── BITÁCORA ── */
+function abrirBitacora(incId, equipo, estado) {
+  modalBitaIncId=incId;
+  document.getElementById('bitaTitulo').textContent=`Bitácora — ${equipo}`;
+  document.getElementById('bitaSubtitulo').textContent=estado;
+  document.getElementById('bitaFooter').style.display=estado==='resuelta'?'none':'flex';
+  document.getElementById('modalBitacora').classList.add('open');
+  if (unsubBitacora) unsubBitacora();
+  unsubBitacora=db.collection('comp_incidencias').doc(incId).collection('bitacora')
+    .orderBy('fecha','asc').onSnapshot(snap=>{
+      const items=snap.docs.map(d=>({id:d.id,...d.data()}));
+      const cont=document.getElementById('bitaTimeline');
+      if (!items.length){cont.innerHTML='<div class="empty">Sin comentarios.</div>';return;}
+      cont.innerHTML=items.map(it=>{
+        const es=it.tipo==='sistema';
+        const f=it.fecha?it.fecha.toDate().toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+        return `<div class="tl-item"><div class="tl-dot ${es?'sistema':'usuario'}">${es?'⚙':'💬'}</div><div class="tl-content"><div class="tl-meta">${f}</div><div class="tl-text ${es?'sistema':''}">${it.texto}</div></div></div>`;
+      }).join('');
+      const mb=document.querySelector('.modal-body');
+      setTimeout(()=>{if(mb)mb.scrollTop=mb.scrollHeight;},50);
+    });
+}
+function cerrarModalBitacora(){
+  document.getElementById('modalBitacora').classList.remove('open');
+  if(unsubBitacora){unsubBitacora();unsubBitacora=null;}
+  modalBitaIncId=null;
+}
+function guardarComentario(){
+  const txt=document.getElementById('bitaComentario').value.trim();
+  if(!txt||!modalBitaIncId){toast('⚠ Escribe un comentario.');return;}
+  db.collection('comp_incidencias').doc(modalBitaIncId).collection('bitacora')
+    .add({texto:txt,tipo:'usuario',fecha:firebase.firestore.FieldValue.serverTimestamp()})
+    .then(()=>{document.getElementById('bitaComentario').value='';}).catch(()=>toast('Error.'));
+}
+document.getElementById('bitaComentario').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')guardarComentario();});
+document.getElementById('modalBitacora').addEventListener('click',e=>{if(e.target===document.getElementById('modalBitacora'))cerrarModalBitacora();});
+
+/* ── HISTÓRICO ── */
+function renderHistorico(){
+  const fSuc=document.getElementById('filtHistSuc').value;
+  const fDes=document.getElementById('filtHistDesde').value;
+  const fHas=document.getElementById('filtHistHasta').value;
+  const fBus=document.getElementById('filtHistBus').value.toLowerCase();
+  const desde=fDes?new Date(fDes+'T00:00:00'):null;
+  const hasta=fHas?new Date(fHas+'T23:59:59'):null;
+  const data=incidenciasCache.filter(i=>{
+    if((i.estado||'abierta')!=='resuelta')return false;
+    if(fSuc&&i.sucursal!==fSuc)return false;
+    if(i.fechaCierre){const fc=i.fechaCierre.toDate();if(desde&&fc<desde)return false;if(hasta&&fc>hasta)return false;}
+    if(fBus&&![(i.equipo||''),(i.colaborador||''),(i.tecnico||''),(i.descripcion||'')].join(' ').toLowerCase().includes(fBus))return false;
+    return true;
+  }).sort((a,b)=>{const da=a.fechaCierre?a.fechaCierre.toDate():new Date(0),db2=b.fechaCierre?b.fechaCierre.toDate():new Date(0);return db2-da;});
+  const tbody=document.getElementById('tablaHist'),empty=document.getElementById('emptyHist');
+  if(!data.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  tbody.innerHTML=data.map((i,idx)=>`<tr>
+    <td style="color:#94a3b8">${idx+1}</td><td>${fmtFecha(i.fecha)}</td><td>${fmtFecha(i.fechaCierre)}</td>
+    <td><strong>${i.equipo||'—'}</strong></td><td>${i.sucursal||'—'}</td><td>${i.colaborador||'—'}</td><td>${i.tecnico||'—'}</td>
+    <td style="font-weight:500;color:#16a34a">${calcTiempo(i.fecha,i.fechaCierre)||'—'}</td>
+    <td style="color:#64748b;max-width:180px">${i.descripcion||'—'}</td>
+    <td><button class="btn btn-sm btn-gray" onclick="abrirBitacora('${i.id}','${(i.equipo||'').replace(/'/g,"\\'")}','resuelta')">📋</button></td>
+  </tr>`).join('');
+}
+function exportarHistCSV(){
+  const data=incidenciasCache.filter(i=>(i.estado||'abierta')==='resuelta');
+  if(!data.length){toast('Sin datos.');return;}
+  const h=['FechaApertura','FechaCierre','Equipo','Sucursal','Colaborador','Tecnico','TiempoResolucion','Descripcion'];
+  const rows=data.map(i=>{const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;return[fmtFecha(i.fecha),fmtFecha(i.fechaCierre),i.equipo,i.sucursal,i.colaborador,i.tecnico,calcTiempo(i.fecha,i.fechaCierre)||'—',i.descripcion].map(esc).join(',');});
+  const csv=[h.join(','),...rows].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`historico_computos_${new Date().toISOString().slice(0,10)}.csv`;a.click();toast('✓ CSV descargado.');
+}
+
+/* ── REPORTES ── */
+function setRepPeriodo(p,btn){
+  repPeriodo=p;
+  document.querySelectorAll('.period-pill').forEach(el=>el.classList.remove('active'));
+  btn.classList.add('active');
+  const cr=document.getElementById('repCustomRange');
+  cr.style.display=p==='custom'?'flex':'none';
+  if(p!=='custom')renderReportes();
+}
+function getRepRango(){
+  const ahora=new Date();let desde,hasta;
+  if(repPeriodo==='custom'){const d=document.getElementById('repDesde').value,h=document.getElementById('repHasta').value;return{desde:d?new Date(d+'T00:00:00'):null,hasta:h?new Date(h+'T23:59:59'):null};}
+  hasta=new Date(ahora);hasta.setHours(23,59,59,999);
+  if(repPeriodo==='dia'){desde=new Date(ahora);desde.setHours(0,0,0,0);}
+  else if(repPeriodo==='semana'){desde=new Date(ahora);desde.setDate(desde.getDate()-desde.getDay());desde.setHours(0,0,0,0);}
+  else{desde=new Date(ahora.getFullYear(),ahora.getMonth(),1,0,0,0,0);}
+  return{desde,hasta};
+}
+function renderReportes(){
+  const{desde,hasta}=getRepRango();
+  const data=incidenciasCache.filter(i=>{
+    if(!i.fecha)return false;const d=i.fecha.toDate();
+    if(desde&&d<desde)return false;if(hasta&&d>hasta)return false;return true;
+  });
+  document.getElementById('rTotal').textContent=data.length;
+  document.getElementById('rEquipos').textContent=new Set(data.map(i=>i.equipoId)).size;
+  document.getElementById('rTecnicos').textContent=new Set(data.map(i=>i.tecnico).filter(Boolean)).size;
+  const tiempos=data.filter(i=>i.estado==='resuelta'&&i.fecha&&i.fechaCierre).map(i=>i.fechaCierre.toDate()-i.fecha.toDate()).filter(m=>m>0);
+  document.getElementById('rMTTR').textContent=tiempos.length?msToLabel(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):'—';
+  // Chart
+  const agr={};data.forEach(i=>{const k=i.fecha.toDate().toISOString().slice(0,10);agr[k]=(agr[k]||0)+1;});
+  const labels=desde&&hasta?[...Array(Math.ceil((hasta-desde)/86400000))].map((_,i)=>new Date(desde.getTime()+i*86400000).toISOString().slice(0,10)):Object.keys(agr).sort();
+  const valores=labels.map(d=>agr[d]||0);
+  if(chartRep)chartRep.destroy();
+  chartRep=new Chart(document.getElementById('graficaRep'),{type:'bar',data:{labels,datasets:[{data:valores,backgroundColor:'rgba(99,102,241,0.75)',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}},grid:{color:'#f1f5f9'}}}}});
+  // Branch bars
+  const porSuc={};data.forEach(i=>{const s=i.sucursal||'—';porSuc[s]=(porSuc[s]||0)+1;});
+  const maxS=Math.max(...Object.values(porSuc),1);
+  document.getElementById('repBranchBars').innerHTML=Object.entries(porSuc).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([n,c])=>`<div class="branch-row"><div class="branch-name">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/maxS*100)}%;background:#6366f1"></div></div><div class="branch-count">${c}</div></div>`).join('')||'<div class="empty">Sin datos.</div>';
+  // Tabla
+  const tbody=document.getElementById('tablaRep'),empty=document.getElementById('emptyRep');
+  if(!data.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  tbody.innerHTML=[...data].sort((a,b)=>b.fecha.toDate()-a.fecha.toDate()).map((i,idx)=>`<tr>
+    <td style="color:#94a3b8">${idx+1}</td><td>${fmtFecha(i.fecha)}</td><td><strong>${i.equipo||'—'}</strong></td>
+    <td>${i.sucursal||'—'}</td><td>${i.tecnico||'—'}</td><td>${chipInc(i.estado||'abierta')}</td>
+    <td style="font-size:12px">${calcTiempo(i.fecha,i.fechaCierre)||'—'}</td>
+    <td style="color:#64748b;font-size:12px">${i.descripcion||'—'}</td>
+  </tr>`).join('');
+}
+function exportarRepCSV(){
+  const{desde,hasta}=getRepRango();
+  const data=incidenciasCache.filter(i=>{if(!i.fecha)return false;const d=i.fecha.toDate();if(desde&&d<desde)return false;if(hasta&&d>hasta)return false;return true;});
+  if(!data.length){toast('Sin datos.');return;}
+  const h=['Fecha','Equipo','Sucursal','Colaborador','Tecnico','Estado','TiempoResolucion','Descripcion'];
+  const rows=data.map(i=>{const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;return[fmtFecha(i.fecha),i.equipo,i.sucursal,i.colaborador,i.tecnico,i.estado||'abierta',calcTiempo(i.fecha,i.fechaCierre)||'—',i.descripcion].map(esc).join(',');});
+  const csv=[h.join(','),...rows].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`reporte_computos_${new Date().toISOString().slice(0,10)}.csv`;a.click();toast('✓ CSV descargado.');
+}
+
+/* ── CONFIGURACIÓN ── */
+function renderConfig(){
+  const cont=document.getElementById('configSucursales');
+  cont.innerHTML=SUCURSALES.map(s=>`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <div style="width:140px;font-size:13px;color:#334155;font-weight:500">${s}</div>
+      <input type="number" id="cfg_${s.replace(/ /g,'_')}" value="${configCache[s]||90}" min="7" max="365" style="width:80px;padding:5px 8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px">
+      <span style="font-size:12px;color:#94a3b8">días</span>
+    </div>`).join('');
+}
+function guardarConfig(){
+  const batch=db.batch();
+  SUCURSALES.forEach(s=>{
+    const el=document.getElementById('cfg_'+s.replace(/ /g,'_'));
+    if(el){const v=parseInt(el.value);if(v>0){configCache[s]=v;batch.set(db.collection('comp_config').doc(s),{dias:v});}}
+  });
+  batch.commit().then(()=>toast('✅ Configuración guardada.')).catch(()=>toast('Error.'));
+}
+
+/* ── FIRESTORE LISTENERS ── */
+db.collection('computos').onSnapshot(snap=>{
+  equiposCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderDashboard();
+  renderInventario();
+  if(document.getElementById('mantenimiento').classList.contains('visible'))renderMantenimiento();
+  renderAlertas();
+});
+db.collection('comp_incidencias').onSnapshot(snap=>{
+  incidenciasCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderDashboard();
+  renderTablaInc();
+  renderIncStats();
+  renderAlertas();
+  if(document.getElementById('historico').classList.contains('visible'))renderHistorico();
+  if(document.getElementById('reportes').classList.contains('visible'))renderReportes();
+});
+db.collection('comp_config').onSnapshot(snap=>{
+  snap.docs.forEach(d=>{configCache[d.id]=d.data().dias;});
+});
+</script>
+</body>
+</html>
